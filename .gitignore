@@ -1,53 +1,94 @@
-# Environment
+# === PRIVATE FILES - NEVER COMMIT ===
 .env
-.env.*
-!.env.example
-venv/
-env/
+.env.local
+.env.*.local
+wallet_backup/
+*private*
+*secret*
+*.pem
+*.key
 
-# Python
-__pycache__/
-*.py[cod]
-*.pyc
-.Python
-
-# Database
+# === DATABASE ===
 *.db
 *.sqlite
 *.sqlite3
 data/db/
 
-# Logs and temporary files
-*.log
-logs/
-*.tmp
-*.bak
-*_backup_*.json
+# === PYTHON ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+.venv/
 
-# Trading data
-data/safety_state.json
-data/models/*.pkl
-trade_history_*.csv
-performance_report*.json
+# === LOGS ===
+logs/
+*.log
+log.txt
+
+# === ML MODELS & DATA ===
+data/models/
+*.pkl
+*.pickle
+*.h5
+*.model
+*_report_*.json
+*_backup_*.json
+*_BACKUP_*.json
+trade_history_export.csv
+wallet_balance_*.json
+performance_report_*.json
+optimization_report_*.json
 ml_readiness_report.json
 
-# IDE
+# === BOT SPECIFIC ===
+data/safety_state.json
+config/SAFETY_OVERRIDE.json
+performance_summary_*.txt
+session_summary_*.json
+wallet_backup_*.json
+
+# === IDE ===
 .vscode/
 .idea/
 *.swp
+*.swo
+*~
+.project
+.pydevproject
+
+# === OS ===
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
 
-# Project specific
-config/bot_control_real.json
-config/*_backup_*.json
-scripts/session_scripts/
-
-# Keep these
-!.gitkeep
-!requirements.txt
-!.env.example
-
-# Session-specific files
-scripts/session_scripts/
-*.bat
-run_monitor.py
+# === TEMPORARY FILES ===
+*.tmp
+*.temp
+*.bak
+*.cache
