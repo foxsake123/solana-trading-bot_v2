@@ -9,7 +9,7 @@ import random
 from typing import Dict, List, Optional, Union, Any
 from datetime import datetime, timedelta, UTC
 from solders.pubkey import Pubkey
-from config import BotConfiguration
+from config.bot_config import BotConfiguration
 
 logger = logging.getLogger('trading_bot.utils')
 

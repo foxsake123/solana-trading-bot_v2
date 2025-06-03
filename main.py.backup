@@ -14,7 +14,7 @@ from config.bot_config import BotConfiguration
 from core.trading.trading_bot import TradingBot
 from core.trading.position_manager import PositionManager
 from core.trading.risk_manager import RiskManager, TradingParameters
-from core.blockchain.solana_client import SolanaTrader
+from core.blockchain.solana_client import SolanaClient
 from core.data.token_scanner import TokenScanner
 from core.data.market_data import MarketDataManager
 from core.analysis.token_analyzer import TokenAnalyzer
@@ -50,7 +50,7 @@ async def main(mode: str = 'simulation'):
         await db.initialize()
         
         # Initialize blockchain client
-        solana_client = SolanaTrader(
+        solana_client = SolanaClient(
             rpc_url=config.rpc_url,
             private_key=config.wallet_private_key,
             simulation_mode=config.simulation_mode

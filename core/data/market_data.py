@@ -14,7 +14,7 @@ class BirdeyeAPI:
     """
     
     def __init__(self):
-        from config import BotConfiguration
+        from config.bot_config import BotConfiguration
         self.api_key = BotConfiguration.API_KEYS.get('BIRDEYE_API_KEY', '')
         self.base_url = "https://public-api.birdeye.so"
         self.cache = {}

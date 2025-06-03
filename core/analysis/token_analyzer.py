@@ -24,7 +24,7 @@ class TokenAnalyzer:
         self.birdeye_api = birdeye_api
         
         # Import configuration
-        from config import BotConfiguration
+        from config.bot_config import BotConfiguration
         self.config = BotConfiguration
         
         # Cache for token data
