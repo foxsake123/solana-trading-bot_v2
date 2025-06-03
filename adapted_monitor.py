@@ -1,4 +1,7 @@
-# live_monitor.py
+#!/usr/bin/env python3
+"""
+Monitor adapted for your database schema
+"""
 import sqlite3
 import time
 import os
@@ -41,12 +44,16 @@ def monitor_bot():
                 10.0 - COALESCE(SUM(CASE WHEN action='BUY' THEN amount_sol ELSE 0 END), 0) + 
                 COALESCE(SUM(CASE WHEN action='SELL' THEN amount_sol ELSE 0 END), 0) as balance
             FROM trades
+            WHERE status IS NULL OR status = 'completed'
             """
             balance = pd.read_sql_query(balance_query, conn).iloc[0]['balance']
             
             # Get recent trades
             recent_trades = pd.read_sql_query(
-                """SELECT * FROM trades ORDER BY id DESC LIMIT 10""", 
+                """SELECT contract_address, action, amount_sol, timestamp 
+                   FROM trades 
+                   ORDER BY id DESC 
+                   LIMIT 10""", 
                 conn
             )
             
@@ -56,7 +63,7 @@ def monitor_bot():
                 t.contract_address,
                 COALESCE(tk.ticker, SUBSTR(t.contract_address, 1, 8)) as ticker,
                 COALESCE(tk.name, 'Unknown') as name,
-                SUM(CASE WHEN t.action='BUY' THEN t.amount_sol ELSE -t.amount END) as holding,
+                SUM(CASE WHEN t.action='BUY' THEN t.amount_sol ELSE -t.amount_sol END) as holding,
                 AVG(CASE WHEN t.action='BUY' THEN t.price ELSE NULL END) as avg_buy_price
             FROM trades t
             LEFT JOIN tokens tk ON t.contract_address = tk.contract_address
@@ -79,9 +86,7 @@ def monitor_bot():
             print(f"\n💼 Active Positions ({len(positions)}):")
             if not positions.empty:
                 for _, pos in positions.iterrows():
-                    is_sim = pos['contract_address'].startswith('SIM')
-                    emoji = "🎮" if is_sim else "💎"
-                    print(f"{emoji} {pos['ticker']}: {pos['holding']:.4f} SOL @ ${pos['avg_buy_price']:.8f}")
+                    print(f"💎 {pos['ticker']}: {pos['holding']:.4f} SOL")
             else:
                 print("No active positions")
             
@@ -89,12 +94,10 @@ def monitor_bot():
             print(f"\n📊 Recent Trades:")
             if not recent_trades.empty:
                 for _, trade in recent_trades.head(5).iterrows():
-                    is_sim = trade['contract_address'].startswith('SIM')
-                    emoji = "🎮" if is_sim else "💎"
                     action_emoji = "🟢" if trade['action'] == "BUY" else "🔴"
                     token = trade['contract_address'][:12] + "..."
                     
-                    print(f"{action_emoji} {emoji} {trade['action']}: {trade['amount']:.4f} SOL - {token}")
+                    print(f"{action_emoji} {trade['action']}: {trade['amount_sol']:.4f} SOL - {token}")
             
             conn.close()
             

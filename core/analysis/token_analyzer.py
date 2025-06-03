@@ -13,23 +13,34 @@ from typing import Dict, List, Any, Optional, Tuple
 logger = logging.getLogger('trading_bot.token_analyzer')
 
 class TokenAnalyzer:
-    def __init__(self, db=None, birdeye_api=None):
+    def __init__(self, config=None, db=None, birdeye_api=None):
         """
-        Initialize the token analyzer
+        Initialize the token analyzer with flexible parameters
         
+        :param config: BotConfiguration instance or config dict
         :param db: Database instance
         :param birdeye_api: BirdeyeAPI instance
         """
         self.db = db
         self.birdeye_api = birdeye_api
         
-        # Import configuration
-        from config.bot_config import BotConfiguration
-        self.config = BotConfiguration
+        # Handle different config types
+        if config is None:
+            # Import configuration if not provided
+            from config.bot_config import BotConfiguration
+            self.config = BotConfiguration
+        elif hasattr(config, '__dict__'):
+            # It's a class instance
+            self.config = config
+        else:
+            # It's a dictionary
+            self.config = type('Config', (), config)
         
         # Cache for token data
         self.token_data_cache = {}
         self.cache_expiry = 3600  # 1 hour
+        
+        logger.info("TokenAnalyzer initialized")
         
     def is_simulation_token(self, contract_address: str) -> bool:
         """

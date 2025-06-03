@@ -444,6 +444,132 @@ class Database:
             
         finally:
             conn.close()
+    def get_token_info(self, contract_address):
+        """
+        Get token information from the database (alias for get_token)
+        
+        :param contract_address: Token contract address
+        :return: Token data as dictionary, or None if not found
+        """
+        return self.get_token(contract_address)
+
+
+    def save_token_info(self, token_data):
+        """
+        Save token information (alias for store_token)
+        
+        :param token_data: Dictionary containing token data
+        :return: True if operation successful, False otherwise
+        """
+        return self.store_token(token_data)
+
+
+    def save_performance_metrics(self, metrics):
+        """
+        Save performance metrics to database
+        
+        :param metrics: Dictionary containing performance metrics
+        :return: True if operation successful, False otherwise
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            
+            # Create performance_metrics table if it doesn't exist
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS performance_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                total_trades INTEGER,
+                winning_trades INTEGER,
+                losing_trades INTEGER,
+                total_pnl_sol REAL,
+                win_rate REAL,
+                current_balance_sol REAL,
+                metrics_json TEXT
+            )
+            ''')
+            
+            timestamp = datetime.now(UTC).isoformat()
+            
+            cursor.execute('''
+            INSERT INTO performance_metrics (
+                timestamp, total_trades, winning_trades, losing_trades,
+                total_pnl_sol, win_rate, current_balance_sol, metrics_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                timestamp,
+                metrics.get('total_trades', 0),
+                metrics.get('winning_trades', 0),
+                metrics.get('losing_trades', 0),
+                metrics.get('total_pnl_sol', 0.0),
+                metrics.get('win_rate', 0.0),
+                metrics.get('current_balance_sol', 0.0),
+                json.dumps(metrics)
+            ))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving performance metrics: {e}")
+            return False
+            
+        finally:
+            conn.close()
+
+
+    def save_token_analysis(self, analysis_data):
+        """
+        Save token analysis results
+        
+        :param analysis_data: Dictionary containing analysis results
+        :return: True if operation successful, False otherwise
+        """
+        conn = sqlite3.connect(self.db_path)
+        try:
+            cursor = conn.cursor()
+            
+            # Create token_analysis table if it doesn't exist
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS token_analysis (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                contract_address TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP,
+                safety_score REAL,
+                buy_recommendation INTEGER,
+                risk_level TEXT,
+                analysis_json TEXT,
+                FOREIGN KEY (contract_address) REFERENCES tokens(contract_address)
+            )
+            ''')
+            
+            timestamp = datetime.now(UTC).isoformat()
+            
+            cursor.execute('''
+            INSERT INTO token_analysis (
+                contract_address, timestamp, safety_score, 
+                buy_recommendation, risk_level, analysis_json
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                analysis_data.get('contract_address'),
+                timestamp,
+                analysis_data.get('safety_score', 0.0),
+                1 if analysis_data.get('buy_recommendation', False) else 0,
+                analysis_data.get('risk_level', 'Unknown'),
+                json.dumps(analysis_data)
+            ))
+            
+            conn.commit()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error saving token analysis: {e}")
+            return False
+            
+        finally:
+            conn.close()
+
 
     def reset_database(self):
         """

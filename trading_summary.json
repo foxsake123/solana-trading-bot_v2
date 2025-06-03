@@ -1,0 +1,19 @@
+{
+  "total_trades": 1214,
+  "total_buys": 607,
+  "total_sells": 607,
+  "unique_tokens": 7,
+  "date_range": {
+    "first_trade": "2025-06-03T05:01:19.605597+00:00",
+    "last_trade": "2025-06-03T06:58:15.845028+00:00"
+  },
+  "performance": {
+    "total_sells": 607,
+    "profitable_sells": 437,
+    "total_pnl": 0.022610621305498776,
+    "avg_gain": 6.124371930236445e-05,
+    "avg_loss": -2.4428729586085195e-05,
+    "best_trade": 0.00023098199267025687,
+    "worst_trade": -7.980480332030917e-05
+  }
+}

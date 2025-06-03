@@ -1,0 +1,56 @@
+{
+  "project": "Solana Trading Bot v2",
+  "export_date": "2025-06-03T02:58:16.873383",
+  "environment": {
+    "python_version": "3.13",
+    "main_packages": [
+      "solana",
+      "pandas",
+      "scikit-learn",
+      "aiohttp",
+      "sqlite3"
+    ]
+  },
+  "bot_status": {
+    "mode": "simulation",
+    "working_components": [
+      "Token scanning",
+      "Token analysis",
+      "Trade execution",
+      "Position monitoring",
+      "Performance tracking"
+    ],
+    "ml_status": "Collecting training data",
+    "issues_resolved": [
+      "Database schema mismatch",
+      "Missing get_token_info method",
+      "TokenAnalyzer initialization",
+      "is_simulation parameter error"
+    ]
+  },
+  "file_structure": {
+    "config": [
+      "bot_control.json",
+      "trading_params.json",
+      "bot_config.py"
+    ],
+    "core": [
+      "trading_bot.py",
+      "token_analyzer.py",
+      "database.py",
+      "solana_client.py"
+    ],
+    "monitoring": [
+      "working_monitor.py",
+      "performance_tracker.py"
+    ],
+    "ml": [
+      "ml_predictor.py",
+      "ml_enhancement_strategy.py"
+    ],
+    "data": [
+      "sol_bot.db",
+      "ml_model.pkl (when trained)"
+    ]
+  }
+}

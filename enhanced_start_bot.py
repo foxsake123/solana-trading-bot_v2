@@ -1,18 +1,17 @@
 #!/usr/bin/env python3
 """
-Simple startup script for Solana Trading Bot v2
+Enhanced startup script with runtime patches for missing methods
 """
 import asyncio
 import logging
 import sys
 import json
+import types
 from datetime import datetime
-import position_override  # Force larger position sizes
 
 # Add imports
 from config.bot_config import BotConfiguration
 from core.trading.trading_bot import TradingBot
-from core.trading.position_manager import PositionManager
 from core.data.token_scanner import TokenScanner
 from core.data.market_data import BirdeyeAPI
 from core.analysis.token_analyzer import TokenAnalyzer
@@ -27,7 +26,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 async def main():
-    """Main entry point"""
+    """Main entry point with runtime patches"""
     # Determine mode from command line
     mode = sys.argv[1] if len(sys.argv) > 1 else 'simulation'
     
@@ -49,12 +48,30 @@ async def main():
         # Initialize database
         db = Database('data/db/sol_bot.db')
         
+        # Runtime patch: Add missing database methods
+        if not hasattr(db, 'get_token_info'):
+            db.get_token_info = types.MethodType(lambda self, addr: self.get_token(addr), db)
+            logger.info("Added get_token_info method to database")
+        
+        if not hasattr(db, 'save_token_info'):
+            db.save_token_info = types.MethodType(lambda self, data: self.store_token(data), db)
+            logger.info("Added save_token_info method to database")
+        
         # Initialize components
         solana_trader = SolanaTrader(db=db, simulation_mode=config['simulation_mode'])
         await solana_trader.connect()
         
-        # Initialize token analyzer first
+        # Initialize token analyzer with config parameter
         token_analyzer = TokenAnalyzer(config, db)
+        
+        # Runtime patch: Add get_token method if missing
+        if not hasattr(token_analyzer, 'get_token'):
+            def get_token(self, address):
+                if self.db:
+                    return self.db.get_token_info(address)
+                return None
+            token_analyzer.get_token = types.MethodType(get_token, token_analyzer)
+            logger.info("Added get_token method to token analyzer")
         
         # Initialize token scanner with correct parameters
         token_scanner = TokenScanner(db, solana_trader, token_analyzer)
@@ -62,6 +79,7 @@ async def main():
         # Set up BirdeyeAPI
         birdeye_api = BirdeyeAPI()
         token_scanner.birdeye_api = birdeye_api
+        token_analyzer.birdeye_api = birdeye_api
         
         # Initialize trading bot
         trading_bot = TradingBot(config, db, token_scanner, solana_trader)

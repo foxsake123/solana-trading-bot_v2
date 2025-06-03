@@ -1,0 +1,56 @@
+﻿# Environment and secrets
+.env
+*.env
+config/bot_control.json
+config/data/bot_control.json
+
+# Virtual environment
+venv/
+env/
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.class
+*.so
+.Python
+
+# Database
+data/db/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+
+# Backups
+*.backup
+*.backup_*
+config/backups/
+
+# ML Models (large files)
+data/models/
+*.pkl
+
+# Trading data exports
+*.csv
+trade_history_export.csv
+tokens_export.csv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Private keys
+*.key
+*.pem
+wallet_*.json

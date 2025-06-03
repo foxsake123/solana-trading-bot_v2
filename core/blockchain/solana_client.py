@@ -193,9 +193,7 @@ class SolanaTrader:
                         action=action,
                         amount=amount,
                         price=price,
-                        tx_hash=tx_hash,
-                        is_simulation=True
-                    )
+                        tx_hash=tx_hash)
                 except Exception as e:
                     logger.error(f"Error recording simulation trade to database: {e}")
         else:
@@ -226,9 +224,7 @@ class SolanaTrader:
                             action=action,
                             amount=amount,
                             price=price,
-                            tx_hash=tx_hash,
-                            is_simulation=False
-                        )
+                            tx_hash=tx_hash)
                     except Exception as e:
                         logger.error(f"Error recording real trade to database: {e}")
                         

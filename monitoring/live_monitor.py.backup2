@@ -38,8 +38,8 @@ def monitor_bot():
             # Get wallet balance (simulation)
             balance_query = """
             SELECT 
-                10.0 - COALESCE(SUM(CASE WHEN action='BUY' THEN amount_sol ELSE 0 END), 0) + 
-                COALESCE(SUM(CASE WHEN action='SELL' THEN amount_sol ELSE 0 END), 0) as balance
+                10.0 - COALESCE(SUM(CASE WHEN action='BUY' THEN amount ELSE 0 END), 0) + 
+                COALESCE(SUM(CASE WHEN action='SELL' THEN amount ELSE 0 END), 0) as balance
             FROM trades
             """
             balance = pd.read_sql_query(balance_query, conn).iloc[0]['balance']
@@ -56,7 +56,7 @@ def monitor_bot():
                 t.contract_address,
                 COALESCE(tk.ticker, SUBSTR(t.contract_address, 1, 8)) as ticker,
                 COALESCE(tk.name, 'Unknown') as name,
-                SUM(CASE WHEN t.action='BUY' THEN t.amount_sol ELSE -t.amount END) as holding,
+                SUM(CASE WHEN t.action='BUY' THEN t.amount ELSE -t.amount END) as holding,
                 AVG(CASE WHEN t.action='BUY' THEN t.price ELSE NULL END) as avg_buy_price
             FROM trades t
             LEFT JOIN tokens tk ON t.contract_address = tk.contract_address

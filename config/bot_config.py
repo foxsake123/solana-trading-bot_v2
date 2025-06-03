@@ -80,8 +80,8 @@ class BotConfiguration:
             'help': "Exit position when loss reaches this percentage"
         },
         'min_investment': {
-            'default': 0.02,
-            'min_value': 0.001,
+            'default': 0.2,
+            'min_value': 0.01,
             'max_value': 1.0,
             'step': 0.001,
             'help': "Minimum SOL amount to invest per token"
