@@ -17,10 +17,10 @@
     "max_drawdown_pct": 0.2,
     "use_technical_analysis": true,
     "slippage_tolerance": 0.1,
-    "min_position_size_pct": 3.0,
-    "default_position_size_pct": 4.0,
-    "absolute_min_sol": 0.05,
-    "absolute_max_sol": 0.12,
+    "min_position_size_pct": 2.0,
+    "default_position_size_pct": 3.0,
+    "absolute_min_sol": 0.02,
+    "absolute_max_sol": 0.05,
     "max_portfolio_risk_pct": 30.0,
     "max_position_size_pct": 5.0
 }

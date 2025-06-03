@@ -1,48 +1,53 @@
+# Environment
+.env
+.env.*
+!.env.example
+venv/
+env/
+
 # Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
+*.pyc
 .Python
-venv/
-env/
-ENV/
-.venv
 
-# Trading Bot Specific
-.env
+# Database
+*.db
+*.sqlite
+*.sqlite3
+data/db/
+
+# Logs and temporary files
 *.log
 logs/
-data/db/*.db
-data/db/*.db-journal
-config/backups/
+*.tmp
 *.bak
-*.backup
+*_backup_*.json
 
-# ML Models and Data
+# Trading data
+data/safety_state.json
 data/models/*.pkl
-data/models/*.joblib
-trade_history_export.csv
-trading_summary.json
-project_state_export.json
+trade_history_*.csv
+performance_report*.json
+ml_readiness_report.json
 
 # IDE
 .vscode/
 .idea/
 *.swp
-*.swo
-
-# OS
 .DS_Store
-Thumbs.db
 
-# Temporary files
-*_temp.py
-*_patch.py
-paste.txt
-project_cleanup_script.py
-project_cleanup_fixed.py
+# Project specific
+config/bot_control_real.json
+config/*_backup_*.json
+scripts/session_scripts/
 
-# Sensitive (remove these lines if you want to commit configs)
-# config/bot_control.json
-# config/trading_params.json
+# Keep these
+!.gitkeep
+!requirements.txt
+!.env.example
+
+# Session-specific files
+scripts/session_scripts/
+*.bat
+run_monitor.py
