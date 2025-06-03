@@ -1,0 +1,16 @@
+{
+  "min_position_size_pct": 3.0,
+  "default_position_size_pct": 4.0,
+  "max_position_size_pct": 5.0,
+  "absolute_min_sol": 0.05,
+  "absolute_max_sol": 2.0,
+  "stop_loss_pct": 0.05,
+  "take_profit_pct": 0.5,
+  "trailing_stop_enabled": true,
+  "trailing_stop_activation_pct": 0.3,
+  "trailing_stop_distance_pct": 0.15,
+  "min_safety_score": 0.0,
+  "min_volume_24h": 30000.0,
+  "min_liquidity": 20000.0,
+  "comment": "Copy to trading_params.json and customize"
+}

@@ -1,19 +1,19 @@
 {
-  "total_trades": 1224,
-  "total_buys": 612,
-  "total_sells": 612,
-  "unique_tokens": 7,
+  "total_trades": 2289,
+  "total_buys": 1147,
+  "total_sells": 1142,
+  "unique_tokens": 10,
   "date_range": {
     "first_trade": "2025-06-03T05:01:19.605597+00:00",
-    "last_trade": "2025-06-03T06:59:15.952707+00:00"
+    "last_trade": "2025-06-03T16:35:38.531445+00:00"
   },
   "performance": {
-    "total_sells": 612,
-    "profitable_sells": 442,
-    "total_pnl": 0.0229414861202353,
-    "avg_gain": 6.129947997708096e-05,
-    "avg_loss": -2.4428729586085195e-05,
+    "total_sells": 1142,
+    "profitable_sells": 867,
+    "total_pnl": 0.04702784465255554,
+    "avg_gain": 6.240055226686287e-05,
+    "avg_loss": -2.572157877387118e-05,
     "best_trade": 0.00023098199267025687,
-    "worst_trade": -7.980480332030917e-05
+    "worst_trade": -9.581902924645152e-05
   }
 }

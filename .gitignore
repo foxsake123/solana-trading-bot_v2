@@ -1,44 +1,30 @@
-﻿# Environment and secrets
-.env
-*.env
-config/bot_control.json
-config/data/bot_control.json
-
-# Virtual environment
-venv/
-env/
-.venv/
-
 # Python
 __pycache__/
 *.py[cod]
-*.class
+*$py.class
 *.so
 .Python
+venv/
+env/
+ENV/
+.venv
 
-# Database
-data/db/
-*.db
-*.sqlite
-*.sqlite3
-
-# Logs
+# Trading Bot Specific
+.env
 *.log
 logs/
-
-# Backups
-*.backup
-*.backup_*
+data/db/*.db
+data/db/*.db-journal
 config/backups/
+*.bak
+*.backup
 
-# ML Models (large files)
-data/models/
-*.pkl
-
-# Trading data exports
-*.csv
+# ML Models and Data
+data/models/*.pkl
+data/models/*.joblib
 trade_history_export.csv
-tokens_export.csv
+trading_summary.json
+project_state_export.json
 
 # IDE
 .vscode/
@@ -50,7 +36,13 @@ tokens_export.csv
 .DS_Store
 Thumbs.db
 
-# Private keys
-*.key
-*.pem
-wallet_*.json
+# Temporary files
+*_temp.py
+*_patch.py
+paste.txt
+project_cleanup_script.py
+project_cleanup_fixed.py
+
+# Sensitive (remove these lines if you want to commit configs)
+# config/bot_control.json
+# config/trading_params.json
