@@ -117,7 +117,7 @@ class TradingBot:
                     logger.info(f"   Reasons: {', '.join(analysis.get('reasons', []))}")
                     
                     # Execute buy
-                    amount = min(max_investment, max(0.3, self.balance * 0.04))  # Max 10% of balance
+                    amount = min(max_investment, self.balance * 0.1)  # Max 10% of balance
                     await self.buy_token(address, amount)
                 else:
                     logger.debug(f"❌ No buy signal for {ticker}")
@@ -128,7 +128,7 @@ class TradingBot:
                 
                 if price_change_24h > 5 and volume_24h > 10000:
                     logger.info(f"✅ Simple buy signal for {ticker} (24h: +{price_change_24h:.1f}%)")
-                    amount = min(max_investment, max(0.3, self.balance * 0.04))
+                    amount = min(max_investment, self.balance * 0.1)
                     await self.buy_token(address, amount)
                     
         except Exception as e:
@@ -138,10 +138,6 @@ class TradingBot:
         """Buy a token"""
         try:
             # Execute trade
-            # FORCE MINIMUM POSITION SIZE
-                    if amount < 0.3:
-                        logger.info(f"Increasing position size from {amount} to 0.3 SOL (minimum)")
-                        amount = 0.3
             tx_hash = await self.trader.buy_token(address, amount)
             
             if tx_hash:
