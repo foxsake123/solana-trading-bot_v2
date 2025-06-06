@@ -1,0 +1,11 @@
+{
+  "simulation_mode": true,
+  "starting_simulation_balance": 10.0,
+  "running": true,
+  "use_machine_learning": true,
+  "ml_confidence_threshold": 0.65,
+  "use_percentage_sizing": true,
+  "max_open_positions": 10,
+  "scan_interval": 60,
+  "comment": "Copy to bot_control.json and customize"
+}

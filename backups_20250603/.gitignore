@@ -1,0 +1,46 @@
+# Critical - Never commit these
+.env
+.env.local
+.env.*.local
+wallet_backup/
+*private*
+*secret*
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+data/db/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+.venv/
+
+# Logs and reports
+logs/
+*.log
+*_report_*.json
+*_backup_*.json
+trade_history_export.csv
+wallet_balance_*.json
+
+# ML Models
+data/models/
+*.pkl
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+config/SAFETY_OVERRIDE.json
+data/safety_state.json

@@ -1,0 +1,81 @@
+{
+    "max_open_positions": 10,
+    "take_profit_pct": 0.5,
+    "stop_loss_pct": 0.05,
+    "trailing_stop_enabled": true,
+    "trailing_stop_activation_pct": 0.3,
+    "trailing_stop_distance_pct": 0.15,
+    "min_safety_score": 0.0,
+    "min_volume_24h": 30000.0,
+    "min_liquidity": 20000.0,
+    "min_holders": 75,
+    "min_market_cap": 100000.0,
+    "use_ml_predictions": true,
+    "ml_confidence_threshold": 0.65,
+    "ml_weight_in_decision": 0.4,
+    "max_daily_loss_pct": 0.1,
+    "max_drawdown_pct": 0.2,
+    "use_technical_analysis": true,
+    "slippage_tolerance": 0.1,
+    "min_position_size_pct": 2.0,
+    "default_position_size_pct": 3.0,
+    "absolute_min_sol": 0.02,
+    "absolute_max_sol": 0.05,
+    "max_portfolio_risk_pct": 30.0,
+    "max_position_size_pct": 5.0,
+    
+    "citadel_mode": {
+        "enabled": true,
+        "strategies": {
+            "momentum": {
+                "enabled": true,
+                "weight": 0.25,
+                "lookback_periods": [5, 10, 20],
+                "min_momentum_score": 0.6
+            },
+            "mean_reversion": {
+                "enabled": true,
+                "weight": 0.25,
+                "bollinger_periods": 20,
+                "bollinger_std": 2.0,
+                "rsi_period": 14,
+                "oversold_threshold": 30,
+                "overbought_threshold": 70
+            },
+            "arbitrage": {
+                "enabled": true,
+                "weight": 0.25,
+                "min_spread_pct": 0.02,
+                "max_execution_time": 5
+            },
+            "ml_alpha": {
+                "enabled": true,
+                "weight": 0.25,
+                "ensemble_models": ["rf", "xgboost", "lstm"],
+                "min_agreement": 0.66
+            }
+        },
+        "winner_amplification": {
+            "enabled": true,
+            "scale_factor": 1.5,
+            "max_scale": 3.0,
+            "performance_window": 24,
+            "min_win_rate": 0.7
+        },
+        "risk_metrics": {
+            "var_confidence": 0.95,
+            "cvar_confidence": 0.95,
+            "sharpe_target": 2.0,
+            "sortino_target": 3.0,
+            "max_leverage": 2.0,
+            "correlation_limit": 0.7
+        },
+        "research_driven": {
+            "backtest_required": true,
+            "min_backtest_trades": 1000,
+            "min_sharpe_ratio": 1.5,
+            "walk_forward_periods": 3,
+            "out_of_sample_pct": 0.3
+        }
+    }
+}
