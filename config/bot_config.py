@@ -37,7 +37,7 @@ class BotConfiguration:
         'TAKE_PROFIT_TARGET': float(os.getenv('TAKE_PROFIT_TARGET', 15.0)),   # 15x profit
         'STOP_LOSS_PERCENTAGE': float(os.getenv('STOP_LOSS_PERCENTAGE', 0.25)),  # 25% loss
         'MOONBAG_PERCENTAGE': float(os.getenv('MOONBAG_PERCENTAGE', 0.15)),  # 15% of position kept as moonbag
-        'MAX_INVESTMENT_PER_TOKEN': float(os.getenv('MAX_INVESTMENT_PER_TOKEN', 1.0)),  # 1 SOL (increased from 0.1)
+        'MAX_INVESTMENT_PER_TOKEN': float(os.getenv('MAX_INVESTMENT_PER_TOKEN', 0.4)),  # 1 SOL (increased from 0.1)
         
         # Token screening parameters
         'MIN_SAFETY_SCORE': float(os.getenv('MIN_SAFETY_SCORE', 50.0)),

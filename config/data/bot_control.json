@@ -4,7 +4,7 @@
     "filter_fake_tokens": true,
     "use_birdeye_api": true,
     "use_machine_learning": false,
-    "max_investment_per_token": 0.1,
+    "max_investment_per_token": 0.4,
     "take_profit_target": 1.5,
     "stop_loss_percentage": 0.25,
     "slippage_tolerance": 0.15,
