@@ -1,0 +1,27 @@
+{
+    "mode": "REAL_TRADING",
+    "created": "2025-06-09T16:13:59.044913",
+    "position_sizing": {
+        "min_position_size_sol": 0.1,
+        "max_position_size_sol": 0.3,
+        "default_position_size_sol": 0.2,
+        "max_open_positions": 10,
+        "risk_per_trade_pct": 2.0
+    },
+    "risk_management": {
+        "daily_loss_limit_sol": 1.0,
+        "max_drawdown_pct": 20.0,
+        "require_confirmation": true
+    },
+    "execution": {
+        "use_limit_orders": true,
+        "max_retry_attempts": 2,
+        "priority_fee_lamports": 5000
+    },
+    "monitoring": {
+        "alert_on_large_loss": true,
+        "alert_threshold_sol": 0.5,
+        "log_all_trades": true,
+        "backup_interval_minutes": 60
+    }
+}

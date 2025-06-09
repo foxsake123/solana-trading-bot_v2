@@ -108,7 +108,7 @@ class SolanaTrader:
                     logger.error(f"Error calculating invested amount: {e}")
             
             # Calculate remaining balance
-            self.wallet_balance = max(0, 10.0 - invested_amount)
+            self.wallet_balance = max(0, self._starting_balance - invested_amount)
         else:
             # In real mode, get the actual wallet balance from the blockchain
             # This is a placeholder - in a real implementation, you would use solana-py
