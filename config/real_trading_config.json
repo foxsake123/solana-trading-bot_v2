@@ -1,6 +1,6 @@
 {
     "mode": "REAL_TRADING",
-    "created": "2025-06-09T16:13:59.044913",
+    "created": "2025-06-09T19:08:56.581653",
     "position_sizing": {
         "min_position_size_sol": 0.1,
         "max_position_size_sol": 0.3,
