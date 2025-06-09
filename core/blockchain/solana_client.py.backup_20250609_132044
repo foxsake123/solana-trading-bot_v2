@@ -26,28 +26,13 @@ class SolanaTrader:
         """
         self.db = db
         self.simulation_mode = simulation_mode
-        
-        # Load starting balance from config
-        if simulation_mode:
-            try:
-                import json
-                with open('config/bot_control.json', 'r') as f:
-                    config = json.load(f)
-                self.wallet_balance = config.get('starting_simulation_balance', 10.0)
-                logger.info(f"Loaded starting balance: {self.wallet_balance} SOL")
-            except:
-                # Use the initial balance instead of hardcoding
-                if not hasattr(self, '_starting_balance'):
-                    self._starting_balance = self.wallet_balance  # Store the initial balance
-                    starting_balance = self._starting_balance
-        else:
-            self.wallet_balance = 0.0  # Will be set from actual wallet
+        self.wallet_balance = 10.0  # Default to 10 SOL for simulation
         self.wallet_address = "SIMULATED_WALLET_ADDRESS"
         self.private_key = None
         self.sol_price = 170.0  # Default SOL price
         self.token_prices = {}  # Cache for token prices
         
-        logger.info(f"Initialized SolanaTrader (simulation_mode={simulation_mode}, balance={self.wallet_balance} SOL)")
+        logger.info(f"Initialized SolanaTrader (simulation_mode={simulation_mode})")
     
     async def connect(self):
         """Connect to the Solana network"""
@@ -108,7 +93,7 @@ class SolanaTrader:
                     logger.error(f"Error calculating invested amount: {e}")
             
             # Calculate remaining balance
-            self.wallet_balance = max(0, 10.0 - invested_amount)
+            self.wallet_balance = max(0, 1.0 - invested_amount)
         else:
             # In real mode, get the actual wallet balance from the blockchain
             # This is a placeholder - in a real implementation, you would use solana-py

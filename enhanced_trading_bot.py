@@ -188,6 +188,12 @@ class EnhancedTradingBot:
             
             # Calculate SOL amount
             amount_sol = balance_sol * position_size_pct
+            # SAFETY CHECK: Ensure position size is reasonable
+            max_position = min(balance_sol * 0.08, 0.8)  # Max 8% of balance or 0.8 SOL
+            if amount_sol > max_position:
+                logger.warning(f"Position size {amount_sol:.4f} exceeds safe maximum {max_position:.4f}")
+                amount_sol = max_position
+            
             
             # Apply minimum position size (important for your profits!)
             min_position_sol = self.config.get('absolute_min_sol', 0.3)
