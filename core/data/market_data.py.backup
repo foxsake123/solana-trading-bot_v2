@@ -192,23 +192,7 @@ class BirdeyeAPI:
         if response and "data" in response:
             tokens = response["data"].get("tokens", [])
             logger.info(f"Found {len(tokens)} tokens from Birdeye")
-            # Ensure proper field mapping
-            mapped_tokens = []
-            for token in tokens:
-                mapped_token = {
-                    "address": token.get("address", ""),
-                    "contract_address": token.get("address", ""),  # Map for database
-                    "symbol": token.get("symbol", ""),
-                    "name": token.get("name", ""),
-                    "price": float(token.get("price", 0) or 0),
-                    "v24hChangePercent": float(token.get("v24hChangePercent", 0) or 0),
-                    "v24hUSD": float(token.get("v24hUSD", 0) or 0),
-                    "liquidity": float(token.get("liquidity", 0) or 0),
-                    "mc": float(token.get("mc", 0) or 0),
-                    "holder": int(token.get("holder", 0) or 0)
-                }
-                mapped_tokens.append(mapped_token)
-            return mapped_tokens
+            return tokens
         return []
         
     async def get_trending_tokens(self, limit: int = 20) -> List[Dict]:
