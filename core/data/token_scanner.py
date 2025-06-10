@@ -13,7 +13,7 @@ class TokenScanner:
         self.db = db
         self.trader = trader
         self.token_analyzer = token_analyzer
-        self.birdeye_api = None  # Will be set later
+        self.birdeye_api = BirdeyeAPI(birdeye_api_key) if birdeye_api_key else None
         logger.info("Initialized real token scanner")
     
     async def get_top_gainers(self) -> List[Dict[str, Any]]:
