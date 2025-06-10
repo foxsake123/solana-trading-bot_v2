@@ -20,6 +20,12 @@ class EnhancedTradingBot(TradingBot):
     
     def __init__(self, config, db, token_scanner, solana_trader):
         super().__init__(config, db, token_scanner, solana_trader)
+
+        # Initialize Birdeye API properly
+        if hasattr(token_scanner, 'birdeye_api') and not token_scanner.birdeye_api:
+            from core.data.market_data import BirdeyeAPI
+            token_scanner.birdeye_api = BirdeyeAPI(config.get('BIRDEYE_API_KEY'))
+            logger.info(f"Birdeye API initialized: {scanner.birdeye_api.is_available}")
         
         # Initialize Citadel-Barra strategy
         self.citadel_strategy = CitadelBarraStrategy(config, db)

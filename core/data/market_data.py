@@ -1,316 +1,528 @@
-import time
-import logging
-import aiohttp
+# core/data/market_data.py
+"""
+Market data module with fully corrected Birdeye API integration
+"""
 import asyncio
-import random
+import aiohttp
+import logging
+import time
+import json
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta, UTC
+from datetime import datetime, timedelta
+from config.bot_config import BotConfiguration
 
-logger = logging.getLogger('trading_bot.birdeye_api')
+logger = logging.getLogger(__name__)
 
 class BirdeyeAPI:
     """
-    Birdeye API client for token data
+    Fixed Birdeye API implementation for token discovery and analysis
     """
     
-    def __init__(self):
-        from config.bot_config import BotConfiguration
-        self.api_key = BotConfiguration.API_KEYS.get('BIRDEYE_API_KEY', '')
+    def __init__(self, api_key: Optional[str] = None):
+        self.api_key = api_key or BotConfiguration.API_KEYS.get('BIRDEYE_API_KEY', '')
         self.base_url = "https://public-api.birdeye.so"
-        self.headers = {"X-API-KEY": self.api_key}
+        self.session = None
+        self.is_available = bool(self.api_key)
+        
+        # Rate limiting for Starter package (100 req/min)
+        self.rate_limit = 100
+        self.request_times = []
+        self.min_interval = 0.6  # 600ms between requests
+        
+        # Cache configuration
         self.cache = {}
-        self.cache_duration = 300  # 5 minutes
+        self.cache_ttl = 300  # 5 minutes
         
-        # Rate limiting
-        self.last_request = 0
-        self.min_request_interval = 0.5  # 500ms between requests (Starter plan limit)
-        
-        logger.info(f"BirdeyeAPI initialized with API key: {'*' * 8}{self.api_key[-4:]}")
+        if not self.is_available:
+            logger.warning("BirdeyeAPI key not found. Limited functionality available.")
+        else:
+            logger.info("BirdeyeAPI initialized successfully")
     
-    async def _wait_for_rate_limit(self):
-        """Ensure we don't exceed rate limits"""
+    async def __aenter__(self):
+        """Async context manager entry"""
+        if self.is_available and not self.session:
+            self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        if self.session:
+            await self.session.close()
+            self.session = None
+            
+    async def _ensure_session(self):
+        """Ensure aiohttp session exists"""
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+            
+    async def _rate_limit_check(self):
+        """Check and enforce rate limits"""
         current_time = time.time()
-        time_since_last_request = current_time - self.last_request
         
-        if time_since_last_request < self.min_request_interval:
-            await asyncio.sleep(self.min_request_interval - time_since_last_request)
+        # Clean old requests
+        self.request_times = [t for t in self.request_times if current_time - t < 60]
         
-        self.last_request = time.time()
-    
-    def _is_fake_token(self, address: str) -> bool:
-        """Simple fake token check"""
-        if not address or not isinstance(address, str):
-            return True
+        # Check rate limit
+        if len(self.request_times) >= self.rate_limit:
+            wait_time = 60 - (current_time - self.request_times[0])
+            if wait_time > 0:
+                logger.warning(f"Rate limit reached. Waiting {wait_time:.1f}s")
+                await asyncio.sleep(wait_time)
         
-        lower_address = address.lower()
+        # Minimum interval between requests
+        if self.request_times:
+            time_since_last = current_time - self.request_times[-1]
+            if time_since_last < self.min_interval:
+                await asyncio.sleep(self.min_interval - time_since_last)
+                
+        self.request_times.append(current_time)
         
-        # Check for suspicious patterns
-        suspicious_terms = ['scam', 'fake', 'test', 'demo']
-        for term in suspicious_terms:
-            if term in lower_address:
-                return True
-        
-        return False
-    
-    async def get_token_list(self, sort_by='v24hUSD', sort_type='desc', offset=0, limit=50):
-        """Get trending tokens from Birdeye"""
-        await self._wait_for_rate_limit()
-        
-        url = f"{self.base_url}/defi/v3/token/list"
-        params = {
-            'sort_by': sort_by,
-            'sort_type': sort_type,
-            'offset': offset,
-            'limit': limit
-        }
-        
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    if response.status != 200:
-                        logger.error(f"Birdeye API error: {response.status}")
-                        return []
-                    
-                    data = await response.json()
-                    tokens = data.get('data', {}).get('items', [])
-                    
-                    # Convert Birdeye format to our standard format
-                    formatted_tokens = []
-                    for token in tokens:
-                        if self._is_fake_token(token.get('address', '')):
-                            continue
-                            
-                        formatted_token = self._format_birdeye_token(token)
-                        formatted_tokens.append(formatted_token)
-                    
-                    logger.info(f"Retrieved {len(formatted_tokens)} tokens from Birdeye")
-                    return formatted_tokens
-                    
-        except Exception as e:
-            logger.error(f"Error fetching token list: {e}")
-            return []
-    
-    def _format_birdeye_token(self, token: Dict) -> Dict:
-        """Convert Birdeye token format to standard format"""
-        return {
-            'address': token.get('address', ''),
-            'contract_address': token.get('address', ''),
-            'symbol': token.get('symbol', 'UNKNOWN'),
-            'ticker': token.get('symbol', 'UNKNOWN'),
-            'name': token.get('name', 'UNKNOWN'),
-            'decimals': token.get('decimals', 9),
-            'price': {'value': float(token.get('price', 0))},
-            'price_usd': float(token.get('price', 0)),
-            'volume': {'value': float(token.get('v24hUSD', 0))},
-            'volume_24h': float(token.get('v24hUSD', 0)),
-            'liquidity': {'value': float(token.get('liquidity', 0))},
-            'liquidity_usd': float(token.get('liquidity', 0)),
-            'priceChange': {
-                '24H': float(token.get('v24hChangePercent', 0)),
-                '1H': float(token.get('v1hChangePercent', 0)),
-                '6H': 0  # Not provided by Birdeye in list endpoint
-            },
-            'price_change_24h': float(token.get('v24hChangePercent', 0)),
-            'price_change_1h': float(token.get('v1hChangePercent', 0)),
-            'price_change_6h': 0,
-            'mc': {'value': float(token.get('mc', 0))},
-            'market_cap': float(token.get('mc', 0)),
-            'mcap': float(token.get('mc', 0)),
-            'holders': token.get('holder', 0),
-            'holdersCount': token.get('holder', 0)
-        }
-    
-    async def get_token_info(self, contract_address: str) -> Optional[Dict]:
-        """Get detailed token information"""
-        if not contract_address or not isinstance(contract_address, str):
+    async def _make_request(self, endpoint: str, params: Optional[Dict] = None) -> Optional[Dict]:
+        """Make API request with error handling"""
+        if not self.is_available:
             return None
-        
-        if self._is_fake_token(contract_address):
-            return None
+            
+        await self._rate_limit_check()
         
         # Check cache
-        cache_key = f"token_info_{contract_address}"
+        cache_key = f"{endpoint}:{json.dumps(params or {})}"
         if cache_key in self.cache:
-            cache_entry = self.cache[cache_key]
-            if time.time() - cache_entry['timestamp'] < self.cache_duration:
-                return cache_entry['data']
+            data, timestamp = self.cache[cache_key]
+            if time.time() - timestamp < self.cache_ttl:
+                return data
+                
+        url = f"{self.base_url}{endpoint}"
+        headers = {
+            "X-API-KEY": self.api_key,
+            "Accept": "application/json"
+        }
         
         try:
-            await self._wait_for_rate_limit()
+            await self._ensure_session()
             
-            url = f"{self.base_url}/defi/v3/token/overview"
-            params = {'address': contract_address}
-            
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    if response.status != 200:
-                        return None
-                    
+            async with self.session.get(url, headers=headers, params=params, timeout=30) as response:
+                if response.status == 200:
                     data = await response.json()
-                    token_data = data.get('data', {})
+                    self.cache[cache_key] = (data, time.time())
+                    return data
+                elif response.status == 429:
+                    logger.error("Rate limit exceeded")
+                    await asyncio.sleep(60)
+                elif response.status == 401:
+                    logger.error("Invalid API key")
+                    self.is_available = False
+                else:
+                    text = await response.text()
+                    logger.error(f"API error {response.status}: {text}")
                     
-                    if not token_data:
-                        return None
-                    
-                    # Format the detailed token info
-                    token_info = self._format_birdeye_token(token_data)
-                    
-                    # Add additional fields from overview endpoint
-                    token_info['price_change_6h'] = float(token_data.get('v6hChangePercent', 0))
-                    token_info['priceChange']['6H'] = float(token_data.get('v6hChangePercent', 0))
-                    
-                    # Cache the result
-                    self.cache[cache_key] = {
-                        'timestamp': time.time(),
-                        'data': token_info
-                    }
-                    
-                    return token_info
-        
+        except asyncio.TimeoutError:
+            logger.error(f"Request timeout for {endpoint}")
         except Exception as e:
-            logger.error(f"Error getting token info for {contract_address}: {e}")
-            return None
-    
-    async def get_token_security_info(self, contract_address: str) -> Optional[Dict]:
-        """Get token security information"""
-        await self._wait_for_rate_limit()
-        
-        try:
-            url = f"{self.base_url}/defi/v3/token/security"
-            params = {'address': contract_address}
+            logger.error(f"Request failed: {e}")
             
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, headers=self.headers, params=params) as response:
-                    if response.status != 200:
-                        return None
-                    
-                    data = await response.json()
-                    security_data = data.get('data', {})
-                    
-                    return {
-                        'securityScore': 100 - (security_data.get('risks', 0) * 10),  # Simple scoring
-                        'liquidityLocked': security_data.get('isLpLocked', False),
-                        'mintingDisabled': security_data.get('isMintable', True) == False,
-                        'isMemeToken': security_data.get('isMeme', False),
-                        'risks': security_data.get('risks', 0)
-                    }
-                    
-        except Exception as e:
-            logger.error(f"Error getting security info: {e}")
-            return None
-    
-    async def get_top_gainers(self, timeframe: str = '24h', limit: int = 10) -> List[Dict]:
+        return None
+        
+    async def get_token_list(self, offset: int = 0, limit: int = 50, 
+                           sort_by: str = "v24hChangePercent", 
+                           sort_type: str = "desc") -> List[Dict]:
+        """
+        Get list of tokens sorted by various criteria
+        """
+        endpoint = "/defi/tokenlist"
+        params = {
+            "sort_by": sort_by,
+            "sort_type": sort_type,
+            "offset": offset,
+            "limit": min(limit, 50)  # Starter limit
+        }
+        
+        response = await self._make_request(endpoint, params)
+        if response and "data" in response:
+            tokens = response["data"].get("tokens", [])
+            logger.info(f"Found {len(tokens)} tokens from Birdeye")
+            return tokens
+        return []
+        
+    async def get_trending_tokens(self, limit: int = 20) -> List[Dict]:
+        """Get trending tokens based on 24h change"""
+        if not self.is_available:
+            logger.warning("BirdeyeAPI not available, using empty list")
+            return []
+            
+        # Get by volume first (more reliable than extreme percentage changes)
+        tokens = await self.get_token_list(
+            limit=limit,
+            sort_by="v24hUSD",
+            sort_type="desc"
+        )
+        return self._format_tokens(tokens)
+        
+    async def get_top_gainers(self, limit: int = 20) -> List[Dict]:
         """Get top gaining tokens"""
-        cache_key = f"top_gainers_{timeframe}_{limit}"
-        if cache_key in self.cache:
-            cache_entry = self.cache[cache_key]
-            if time.time() - cache_entry['timestamp'] < self.cache_duration:
-                return cache_entry['data']
-        
-        # Map timeframe to sort_by parameter
-        sort_by_map = {
-            '1h': 'v1hChangePercent',
-            '24h': 'v24hChangePercent'
-        }
-        sort_by = sort_by_map.get(timeframe, 'v24hChangePercent')
-        
-        tokens = await self.get_token_list(sort_by=sort_by, limit=limit * 2)
-        
-        # Filter for positive gainers with volume
-        gainers = []
-        for token in tokens:
-            price_change_key = f'price_change_{timeframe[:-1]}h'
-            price_change = token.get(price_change_key, 0)
+        if not self.is_available:
+            return []
             
-            if price_change > 1 and token.get('volume_24h', 0) > 5000:
-                gainers.append(token)
+        tokens = await self.get_token_list(
+            limit=limit,
+            sort_by="v24hChangePercent",
+            sort_type="desc"
+        )
+        # Filter out tokens with unrealistic gains
+        filtered_tokens = [t for t in tokens if self._is_realistic_gain(t)]
+        return self._format_tokens(filtered_tokens)
         
-        result = gainers[:limit]
+    async def get_new_listings(self, limit: int = 20) -> List[Dict]:
+        """Get newly listed tokens by volume"""
+        if not self.is_available:
+            return []
+            
+        tokens = await self.get_token_list(
+            limit=limit,
+            sort_by="v24hUSD",
+            sort_type="desc"
+        )
+        return self._format_tokens(tokens)
         
-        # Cache result
-        self.cache[cache_key] = {
-            'timestamp': time.time(),
-            'data': result
-        }
+    def _is_realistic_gain(self, token: Dict) -> bool:
+        """Filter out tokens with unrealistic percentage gains"""
+        change = token.get("v24hChangePercent", 0)
+        # Filter out tokens with gains over 10,000% (100x) as they're likely errors
+        return -99 <= change <= 10000
         
-        logger.info(f"Found {len(result)} top gainers for {timeframe}")
-        return result
-    
-    async def get_trending_tokens(self, limit: int = 10) -> List[Dict]:
-        """Get trending tokens by volume"""
-        cache_key = f"trending_tokens_{limit}"
-        if cache_key in self.cache:
-            cache_entry = self.cache[cache_key]
-            if time.time() - cache_entry['timestamp'] < self.cache_duration:
-                return cache_entry['data']
-        
-        # Get by volume
-        tokens = await self.get_token_list(sort_by='v24hUSD', limit=limit * 2)
-        
-        # Filter by volume and liquidity thresholds
-        trending = []
+    def _format_tokens(self, tokens: List[Dict]) -> List[Dict]:
+        """Format tokens for compatibility with bot"""
+        formatted = []
         for token in tokens:
-            if (token.get('volume_24h', 0) > 10000 and 
-                token.get('liquidity_usd', 0) > 10000):
-                trending.append(token)
+            try:
+                # Get price - need to fetch separately if not available
+                price = 0
+                if token.get("price"):
+                    price = float(token["price"])
+                elif token.get("lastTrade"):
+                    price = float(token["lastTrade"])
+                
+                # Ensure we have valid numeric values
+                volume = float(token.get("v24hUSD", 0) or 0)
+                liquidity = float(token.get("liquidity", 0) or 0)
+                market_cap = float(token.get("mc", 0) or 0)
+                change_24h = float(token.get("v24hChangePercent", 0) or 0)
+                
+                # Sanity check on percentage change
+                if change_24h > 10000:  # Over 100x gain
+                    change_24h = 0  # Reset to 0 as it's likely bad data
+                
+                formatted_token = {
+                    "contract_address": token.get("address", ""),
+                    "symbol": token.get("symbol", "UNKNOWN"),
+                    "name": token.get("name", token.get("symbol", "Unknown")),
+                    "price": price,
+                    "price_change_24h": change_24h,
+                    "volume_24h": volume,
+                    "liquidity": liquidity,
+                    "market_cap": market_cap,
+                    "holders": int(token.get("holder", 0) or 0),
+                    "source": "birdeye"
+                }
+                
+                # Skip tokens with no address or very low volume
+                if not formatted_token["contract_address"] or volume < 100:
+                    continue
+                    
+                formatted.append(formatted_token)
+            except Exception as e:
+                logger.debug(f"Error formatting token {token.get('symbol', 'unknown')}: {e}")
+                continue
+                
+        return formatted
         
-        result = trending[:limit]
-        
-        # Cache result
-        self.cache[cache_key] = {
-            'timestamp': time.time(),
-            'data': result
-        }
-        
-        logger.info(f"Found {len(result)} trending tokens")
-        return result
-    
-    async def get_token_price(self, contract_address: str) -> Optional[float]:
-        """Get token price"""
-        token_info = await self.get_token_info(contract_address)
-        if token_info:
-            return token_info.get('price_usd', 0)
-        return None
-    
-    async def get_token_volume(self, contract_address: str) -> Optional[float]:
-        """Get 24h volume"""
-        token_info = await self.get_token_info(contract_address)
-        if token_info:
-            return token_info.get('volume_24h', 0)
-        return None
-    
-    async def get_token_liquidity(self, contract_address: str) -> Optional[float]:
-        """Get liquidity"""
-        token_info = await self.get_token_info(contract_address)
-        if token_info:
-            return token_info.get('liquidity_usd', 0)
-        return None
-    
-    async def get_holders_count(self, contract_address: str) -> Optional[int]:
-        """Get holders count"""
-        token_info = await self.get_token_info(contract_address)
-        if token_info:
-            return token_info.get('holders', 0)
-        return 0
-    
-    async def get_market_cap(self, contract_address: str) -> Optional[float]:
-        """Get market cap"""
-        token_info = await self.get_token_info(contract_address)
-        if token_info:
-            return token_info.get('market_cap', 0)
-        return None
-    
-    async def get_price_change(self, contract_address: str, timeframe: str) -> Optional[float]:
-        """Get price change"""
-        token_info = await self.get_token_info(contract_address)
-        if not token_info:
+    async def get_token_price(self, address: str) -> Optional[Dict]:
+        """Get token price information"""
+        if not self.is_available:
             return None
+            
+        endpoint = "/defi/price"
+        params = {"address": address}
         
-        if timeframe == '1h':
-            return token_info.get('price_change_1h', 0)
-        elif timeframe == '6h':
-            return token_info.get('price_change_6h', 0)
-        elif timeframe == '24h':
-            return token_info.get('price_change_24h', 0)
-        
+        response = await self._make_request(endpoint, params)
+        if response and "data" in response:
+            return response["data"]
         return None
+        
+    async def get_token_overview(self, address: str) -> Optional[Dict]:
+        """Get detailed token information"""
+        if not self.is_available:
+            return None
+            
+        endpoint = "/defi/token_overview"
+        params = {"address": address}
+        
+        response = await self._make_request(endpoint, params)
+        if response and "data" in response:
+            return response["data"]
+        return None
+        
+    async def get_token_security(self, address: str) -> Optional[Dict]:
+        """Get token security information"""
+        if not self.is_available:
+            return None
+            
+        endpoint = "/defi/token_security"
+        params = {"address": address}
+        
+        response = await self._make_request(endpoint, params)
+        if response and "data" in response:
+            return response["data"]
+        return None
+        
+    async def discover_tokens(self, strategies: List[str] = None, max_tokens: int = 30) -> List[Dict]:
+        """Discover tokens using multiple strategies"""
+        if not self.is_available:
+            logger.warning("BirdeyeAPI not available for token discovery")
+            return []
+            
+        if strategies is None:
+            strategies = ["volume", "gainers"]  # Volume first as it's more reliable
+            
+        discovered = {}
+        tokens_per_strategy = max(10, max_tokens // len(strategies))
+        
+        for strategy in strategies:
+            try:
+                if strategy == "volume":
+                    tokens = await self.get_trending_tokens(limit=tokens_per_strategy)
+                elif strategy == "gainers":
+                    tokens = await self.get_top_gainers(limit=tokens_per_strategy)
+                elif strategy == "new":
+                    tokens = await self.get_new_listings(limit=tokens_per_strategy)
+                else:
+                    continue
+                    
+                # Deduplicate by address
+                for token in tokens:
+                    if token.get("contract_address") and token["volume_24h"] > 100:
+                        discovered[token["contract_address"]] = token
+                        
+            except Exception as e:
+                logger.error(f"Error in {strategy} discovery: {e}")
+                
+        result = list(discovered.values())[:max_tokens]
+        
+        # Get prices for tokens if missing
+        for token in result:
+            if token["price"] == 0 and token.get("contract_address"):
+                try:
+                    price_data = await self.get_token_price(token["contract_address"])
+                    if price_data and price_data.get("value"):
+                        token["price"] = float(price_data["value"])
+                except Exception as e:
+                    logger.debug(f"Failed to get price for {token['symbol']}: {e}")
+                    
+        logger.info(f"Discovered {len(result)} unique tokens via Birdeye")
+        return result
+
+# Fallback token discovery using DexScreener
+class DexScreenerAPI:
+    """Fallback API for token discovery when Birdeye is unavailable"""
+    
+    def __init__(self):
+        self.base_url = "https://api.dexscreener.com/latest/dex"
+        self.session = None
+        
+    async def __aenter__(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+            
+    async def get_trending_tokens(self, limit: int = 20) -> List[Dict]:
+        """Get trending tokens from DexScreener"""
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+                
+            url = f"{self.base_url}/search?q=trending"
+            async with self.session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    pairs = data.get("pairs", [])
+                    
+                    tokens = []
+                    seen_addresses = set()
+                    
+                    for pair in pairs:
+                        if pair.get("chainId") != "solana":
+                            continue
+                            
+                        base_token = pair.get("baseToken", {})
+                        address = base_token.get("address", "")
+                        
+                        if not address or address in seen_addresses:
+                            continue
+                            
+                        seen_addresses.add(address)
+                        
+                        tokens.append({
+                            "contract_address": address,
+                            "symbol": base_token.get("symbol", ""),
+                            "name": base_token.get("name", ""),
+                            "price": float(pair.get("priceUsd", 0) or 0),
+                            "price_change_24h": float(pair.get("priceChange", {}).get("h24", 0) or 0),
+                            "volume_24h": float(pair.get("volume", {}).get("h24", 0) or 0),
+                            "liquidity": float(pair.get("liquidity", {}).get("usd", 0) or 0),
+                            "market_cap": float(pair.get("fdv", 0) or 0),
+                            "source": "dexscreener"
+                        })
+                        
+                        if len(tokens) >= limit:
+                            break
+                            
+                    logger.info(f"Found {len(tokens)} tokens from DexScreener")
+                    return tokens
+                    
+        except Exception as e:
+            logger.error(f"DexScreener API error: {e}")
+            
+        return []
+
+
+# Main market data aggregator
+class MarketDataAggregator:
+    """Aggregates data from multiple sources"""
+    
+    def __init__(self, birdeye_api_key: Optional[str] = None):
+        self.birdeye = BirdeyeAPI(birdeye_api_key)
+        self.dexscreener = DexScreenerAPI()
+        
+    async def discover_tokens(self, max_tokens: int = 50) -> List[Dict]:
+        """Discover tokens from all available sources"""
+        all_tokens = {}
+        
+        # Try Birdeye first
+        async with self.birdeye:
+            birdeye_tokens = await self.birdeye.discover_tokens(max_tokens=max_tokens)
+            for token in birdeye_tokens:
+                if token.get("contract_address"):
+                    all_tokens[token["contract_address"]] = token
+                    
+        # If Birdeye didn't return enough, use DexScreener
+        if len(all_tokens) < max_tokens // 2:
+            async with self.dexscreener:
+                dex_tokens = await self.dexscreener.get_trending_tokens(limit=max_tokens)
+                for token in dex_tokens:
+                    if token.get("contract_address") and token["contract_address"] not in all_tokens:
+                        all_tokens[token["contract_address"]] = token
+                        
+        result = list(all_tokens.values())[:max_tokens]
+        
+        # Sort by volume
+        result.sort(key=lambda x: x.get("volume_24h", 0), reverse=True)
+        
+        logger.info(f"Aggregated {len(result)} tokens from all sources")
+        return result
+    # ADD THESE CLASSES TO THE END OF YOUR market_data.py FILE
+
+# Fallback token discovery using DexScreener
+class DexScreenerAPI:
+    """Fallback API for token discovery when Birdeye is unavailable"""
+    
+    def __init__(self):
+        self.base_url = "https://api.dexscreener.com/latest/dex"
+        self.session = None
+        
+    async def __aenter__(self):
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+        return self
+        
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self.session:
+            await self.session.close()
+            
+    async def get_trending_tokens(self, limit: int = 20) -> List[Dict]:
+        """Get trending tokens from DexScreener"""
+        try:
+            if not self.session:
+                self.session = aiohttp.ClientSession()
+                
+            url = f"{self.base_url}/search?q=trending"
+            async with self.session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    pairs = data.get("pairs", [])
+                    
+                    tokens = []
+                    seen_addresses = set()
+                    
+                    for pair in pairs:
+                        if pair.get("chainId") != "solana":
+                            continue
+                            
+                        base_token = pair.get("baseToken", {})
+                        address = base_token.get("address", "")
+                        
+                        if not address or address in seen_addresses:
+                            continue
+                            
+                        seen_addresses.add(address)
+                        
+                        tokens.append({
+                            "contract_address": address,
+                            "symbol": base_token.get("symbol", ""),
+                            "name": base_token.get("name", ""),
+                            "price": float(pair.get("priceUsd", 0) or 0),
+                            "price_change_24h": float(pair.get("priceChange", {}).get("h24", 0) or 0),
+                            "volume_24h": float(pair.get("volume", {}).get("h24", 0) or 0),
+                            "liquidity": float(pair.get("liquidity", {}).get("usd", 0) or 0),
+                            "market_cap": float(pair.get("fdv", 0) or 0),
+                            "source": "dexscreener"
+                        })
+                        
+                        if len(tokens) >= limit:
+                            break
+                            
+                    logger.info(f"Found {len(tokens)} tokens from DexScreener")
+                    return tokens
+                    
+        except Exception as e:
+            logger.error(f"DexScreener API error: {e}")
+            
+        return []
+
+
+# Main market data aggregator
+class MarketDataAggregator:
+    """Aggregates data from multiple sources"""
+    
+    def __init__(self, birdeye_api_key: Optional[str] = None):
+        self.birdeye = BirdeyeAPI(birdeye_api_key)
+        self.dexscreener = DexScreenerAPI()
+        
+    async def discover_tokens(self, max_tokens: int = 50) -> List[Dict]:
+        """Discover tokens from all available sources"""
+        all_tokens = {}
+        
+        # Try Birdeye first
+        async with self.birdeye:
+            birdeye_tokens = await self.birdeye.discover_tokens(max_tokens=max_tokens)
+            for token in birdeye_tokens:
+                if token.get("contract_address"):
+                    all_tokens[token["contract_address"]] = token
+                    
+        # If Birdeye didn't return enough, use DexScreener
+        if len(all_tokens) < max_tokens // 2:
+            async with self.dexscreener:
+                dex_tokens = await self.dexscreener.get_trending_tokens(limit=max_tokens)
+                for token in dex_tokens:
+                    if token.get("contract_address") and token["contract_address"] not in all_tokens:
+                        all_tokens[token["contract_address"]] = token
+                        
+        result = list(all_tokens.values())[:max_tokens]
+        
+        # Sort by volume
+        result.sort(key=lambda x: x.get("volume_24h", 0), reverse=True)
+        
+        logger.info(f"Aggregated {len(result)} tokens from all sources")
+        return result
