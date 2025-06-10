@@ -305,3 +305,42 @@ class TokenAnalyzer:
         }
         
         return analysis
+    
+    async def analyze(self, token_data: Dict) -> Dict:
+        """Analyze a token and return analysis results"""
+        try:
+            # Basic scoring
+            score = 0.5
+        
+            # Adjust based on price change
+            price_change = token_data.get('price_change_24h', 0)
+            if price_change > 20:
+                score += 0.2
+            elif price_change > 10:
+                score += 0.1
+            elif price_change < -20:
+                score -= 0.2
+        
+            # Adjust based on volume
+            volume = token_data.get('volume_24h', 0)
+            if volume > 1000000:  # $1M+
+                score += 0.2
+            elif volume > 100000:  # $100k+
+                score += 0.1
+        
+            # Adjust based on liquidity
+            liquidity = token_data.get('liquidity', 0)
+            if liquidity > 500000:  # $500k+
+                score += 0.1
+            elif liquidity < 50000:
+                score -= 0.1
+        
+            # Keep score in valid range
+            score = max(0, min(1, score))
+        
+            return {
+                'score': score,
+                'recommendation': 'BUY' if score > 0.7 else 'HOLD' if score > 0.4 else 'SKIP'
+            }
+        except Exception as e:
+            return {'score': 0, 'error': str(e)}

@@ -45,4 +45,4 @@ headers = {"X-API-KEY": self.api_key}
 4. **Risk management** - Portfolio-level controls
 5. **Backtesting framework** - Test strategy variations
 
-The bot is ready but needs Birdeye API properly configured for token discovery.
+The bot is ready but needs Birdeye API properly configured for token discovery. 
