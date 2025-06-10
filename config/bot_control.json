@@ -21,5 +21,8 @@
   "MIN_PRICE_CHANGE_24H": -50.0,
   "MAX_PRICE_CHANGE_24H": 10000.0,
   "position_sizing_config": "See config/trading_params.json",
-  "use_percentage_sizing": true
+  "use_percentage_sizing": true,
+  "min_position_size_pct": 3.0,
+  "max_position_size_pct": 5.0,
+  "absolute_min_sol": 0.1
 }

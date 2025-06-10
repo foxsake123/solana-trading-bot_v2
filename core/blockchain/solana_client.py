@@ -34,14 +34,14 @@ class SolanaTrader:
                 with open('config/bot_control.json', 'r') as f:
                     config = json.load(f)
                 self.wallet_balance = config.get('starting_simulation_balance', 10.0)
+                self._starting_balance = self.wallet_balance  # Store initial balance
                 logger.info(f"Loaded starting balance: {self.wallet_balance} SOL")
             except:
-                # Use the initial balance instead of hardcoding
-                if not hasattr(self, '_starting_balance'):
-                    self._starting_balance = self.wallet_balance  # Store the initial balance
-                    starting_balance = self._starting_balance
+                self.wallet_balance = 10.0  # Default fallback
+                self._starting_balance = self.wallet_balance
         else:
             self.wallet_balance = 0.0  # Will be set from actual wallet
+            self._starting_balance = 0.0
         self.wallet_address = "SIMULATED_WALLET_ADDRESS"
         self.private_key = None
         self.sol_price = 170.0  # Default SOL price

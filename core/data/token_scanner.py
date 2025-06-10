@@ -19,6 +19,53 @@ class TokenScanner:
     Scans for potential tokens using multiple data sources
     """
     
+    async def start_scanning(self):
+        """Start the token scanning loop"""
+        logger.info("Token scanner started - scanning every %d seconds", self.scan_interval)
+        
+        while True:
+            try:
+                # Discover new tokens
+                logger.info("Scanning for new tokens...")
+                
+                # Get top gainers
+                if hasattr(self, 'birdeye_api') and self.birdeye_api:
+                    try:
+                        tokens = await self.birdeye_api.get_token_list(limit=10)
+                        if tokens:
+                            logger.info(f"Found {len(tokens)} tokens from Birdeye")
+                            
+                            # Analyze each token
+                            for token in tokens:
+                                try:
+                                    # Skip if already processing
+                                    address = token.get('address', '')
+                                    if not address:
+                                        continue
+                                    
+                                    # Analyze token
+                                    if self.token_analyzer:
+                                        analysis = await self.token_analyzer.analyze(token)
+                                        
+                                        # Store in database if good
+                                        if analysis.get('score', 0) > 0.5:
+                                            if self.db:
+                                                self.db.store_token(token)
+                                            logger.info(f"Found promising token: {token.get('symbol')} (score: {analysis.get('score', 0):.2f})")
+                                    
+                                except Exception as e:
+                                    logger.error(f"Error analyzing token: {e}")
+                                    
+                    except Exception as e:
+                        logger.error(f"Error getting tokens: {e}")
+                
+                # Wait before next scan
+                await asyncio.sleep(self.scan_interval)
+                
+            except Exception as e:
+                logger.error(f"Scanner error: {e}")
+                await asyncio.sleep(10)  # Wait 10 seconds on error
+
     def __init__(self, config: Dict, token_analyzer: TokenAnalyzer, birdeye_api_key: Optional[str] = None):
         """
         Initialize the TokenScanner
