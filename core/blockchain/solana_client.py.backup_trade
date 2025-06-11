@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import asyncio
 
 # Set up logging
-logger = logging.getLogger('simplified_solana_trader')
+logger = logging.getLogger('simplified_solana_trader')  
 
 class SolanaTrader:
     """
