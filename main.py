@@ -1,131 +1,105 @@
-# main.py - Main entry point for Solana Trading Bot v2
-
+#!/usr/bin/env python3
+"""
+Enhanced startup script for Solana Trading Bot v2 with all new features
+"""
 import asyncio
-import argparse
 import logging
 import sys
-import os
+import json
 from datetime import datetime
 
-# Add project root to path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
+# Core imports
 from config.bot_config import BotConfiguration
-from core.trading.trading_bot import TradingBot
-from core.trading.position_manager import PositionManager
-from core.trading.risk_manager import RiskManager, TradingParameters
-from core.blockchain.solana_client import SolanaTrader
 from core.data.token_scanner import TokenScanner
-from core.data.market_data import MarketDataManager
+from core.data.market_data import BirdeyeAPI
 from core.analysis.token_analyzer import TokenAnalyzer
+from core.blockchain.solana_client import SolanaTrader
 from core.storage.database import Database
-from ml.models.ml_predictor import MLPredictor
-from monitoring.performance_tracker import PerformanceTracker
-from utils.logger import setup_logging
+from dotenv import load_dotenv
+load_dotenv()
 
-async def main(mode: str = 'simulation'):
-    """Main entry point for the trading bot"""
-    
-    # Setup logging
-    setup_logging(level=logging.INFO)
-    logger = logging.getLogger(__name__)
+# Import enhanced bot
+from enhanced_trading_bot import EnhancedTradingBot
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+async def main():
+    """Enhanced main entry point"""
+    mode = sys.argv[1] if len(sys.argv) > 1 else 'simulation'
     
     logger.info(f"{'='*60}")
-    logger.info(f"Solana Trading Bot v2 Starting - {mode.upper()} MODE")
+    logger.info(f"Solana Trading Bot v2 ENHANCED - {mode.upper()} MODE")
     logger.info(f"{'='*60}")
     
     try:
-        # Load configuration
-        config = BotConfiguration.load_from_file('config/bot_control.json')
-        trading_params = TradingParameters.load_from_file('config/trading_params.json')
+        # Load configurations
+        with open('config/bot_control.json', 'r') as f:
+            config = json.load(f)
         
-        # Override simulation mode from command line
-        if mode == 'real':
-            config.simulation_mode = False
-        else:
-            config.simulation_mode = True
+        with open('config/trading_params.json', 'r') as f:
+            trading_params = json.load(f)
+        
+        config.update(trading_params)
+        config['BIRDEYE_API_KEY'] = BotConfiguration.API_KEYS['BIRDEYE_API_KEY']
+
+        # Override simulation mode
+        config['simulation_mode'] = (mode != 'real')
+        
+        # Show active features
+        logger.info("🚀 ENHANCED FEATURES:")
+        logger.info(f"   ✅ Citadel-Barra Strategy: {config.get('use_citadel_strategy', False)}")
+        logger.info(f"   ✅ Twitter Sentiment: {bool(config.get('twitter', {}).get('bearer_token'))}")
+        logger.info(f"   ✅ Partial Exits: {config.get('use_partial_exits', True)}")
+        logger.info(f"   ✅ Whale Tracking: {bool(BotConfiguration.API_KEYS['BIRDEYE_API_KEY'],)}")
+        logger.info(f"   ✅ Jupiter Routing: {config.get('use_jupiter', True)}")
+        logger.info(f"   ✅ ML Auto-Retrain: {config.get('ml_auto_retrain', True)}")
         
         # Initialize database
-        db = Database(config.database_path)
-        await db.initialize()
-        
-        # Initialize blockchain client
-        solana_client = SolanaTrader(
-            rpc_url=config.rpc_url,
-            private_key=config.wallet_private_key,
-            simulation_mode=config.simulation_mode
-        )
-        await solana_client.connect()
-        
-        # Get initial balance
-        balance_sol, balance_usd = await solana_client.get_wallet_balance()
-        logger.info(f"Initial balance: {balance_sol:.4f} SOL (${balance_usd:.2f})")
+        db = Database('data/db/sol_bot.db')
         
         # Initialize components
-        market_data = MarketDataManager(config)
-        token_analyzer = TokenAnalyzer(db, market_data)
-        token_scanner = TokenScanner(db, market_data, token_analyzer)
-        ml_predictor = MLPredictor()
+        solana_trader = SolanaTrader(db=db, simulation_mode=config['simulation_mode'])
+        await solana_trader.connect()
         
-        # Load ML models if available
-        if os.path.exists('data/models/enhanced'):
-            ml_predictor.load_models('data/models/enhanced')
-            logger.info("ML models loaded successfully")
-        else:
-            logger.warning("ML models not found - trading without ML predictions")
-        
-        # Initialize managers
-        risk_manager = RiskManager(trading_params, balance_sol)
-        position_manager = PositionManager(db, risk_manager)
-        performance_tracker = PerformanceTracker(db)
-        
-        # Initialize trading bot
-        trading_bot = TradingBot(
-            config=config,
-            trading_params=trading_params,
-            solana_client=solana_client,
-            token_scanner=token_scanner,
-            token_analyzer=token_analyzer,
-            position_manager=position_manager,
-            risk_manager=risk_manager,
-            ml_predictor=ml_predictor,
-            performance_tracker=performance_tracker
+        token_analyzer = TokenAnalyzer(config, db)
+        token_scanner = TokenScanner(
+            config,
+            token_analyzer,
+            BotConfiguration.API_KEYS['BIRDEYE_API_KEY'],
         )
         
+        # Initialize ENHANCED trading bot
+        trading_bot = EnhancedTradingBot(config, db, token_scanner, solana_trader)
+        
+        # Start Twitter trending discovery
+        if config.get('twitter', {}).get('bearer_token'):
+            asyncio.create_task(discover_trending_loop(trading_bot))
+        
         # Start trading
-        logger.info("Starting trading bot...")
+        logger.info("🚀 Starting enhanced trading bot...")
         await trading_bot.start()
         
-        # Keep running until interrupted
-        try:
-            while True:
-                await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            logger.info("Shutting down...")
+    except KeyboardInterrupt:
+        logger.info("Shutting down gracefully...")
+        if 'trading_bot' in locals():
             await trading_bot.stop()
-            
     except Exception as e:
         logger.error(f"Fatal error: {e}", exc_info=True)
         sys.exit(1)
-    finally:
-        await solana_client.close()
-        await db.close()
+
+async def discover_trending_loop(bot):
+    """Discover trending tokens from Twitter"""
+    while True:
+        try:
+            await asyncio.sleep(300)  # Every 5 minutes
+            await bot.discover_trending_tokens()
+        except Exception as e:
+            logger.error(f"Trending discovery error: {e}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Solana Trading Bot v2')
-    parser.add_argument(
-        '--mode',
-        choices=['simulation', 'real'],
-        default='simulation',
-        help='Trading mode (default: simulation)'
-    )
-    parser.add_argument(
-        '--config',
-        default='config/bot_control.json',
-        help='Path to configuration file'
-    )
-    
-    args = parser.parse_args()
-    
-    # Run the bot
-    asyncio.run(main(args.mode))
+    asyncio.run(main())
