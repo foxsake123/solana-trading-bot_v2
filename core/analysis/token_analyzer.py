@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 
 from core.storage.database import Database
-from core.data.market_data import MarketDataManager
+from core.data.market_data import MarketDataAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +12,13 @@ class TokenAnalyzer:
     """
     Analyzes token data to generate a score and make trading decisions.
     """
-    def __init__(self, db: Database, market_data: MarketDataManager, config):
+    def __init__(self, db: Database, market_data: MarketDataAggregator, config):
         """
         Initializes the TokenAnalyzer.
 
         Args:
             db: The database instance.
-            market_data: The MarketDataManager for fetching on-chain data.
+            market_data: The MarketDataAggregator for fetching on-chain data.
             config: The unified bot configuration object.
         """
         self.db = db
