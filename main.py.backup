@@ -16,7 +16,7 @@ from core.trading.position_manager import PositionManager
 from core.trading.risk_manager import RiskManager, TradingParameters
 from core.blockchain.solana_client import SolanaClient
 from core.data.token_scanner import TokenScanner
-from core.data.market_data import MarketDataManager
+from core.data.market_data import MarketDataAggregator
 from core.analysis.token_analyzer import TokenAnalyzer
 from core.storage.database import Database
 from ml.models.ml_predictor import MLPredictor
@@ -62,7 +62,7 @@ async def main(mode: str = 'simulation'):
         logger.info(f"Initial balance: {balance_sol:.4f} SOL (${balance_usd:.2f})")
         
         # Initialize components
-        market_data = MarketDataManager(config)
+        market_data = MarketDataAggregator(config)
         token_analyzer = TokenAnalyzer(db, market_data)
         token_scanner = TokenScanner(db, market_data, token_analyzer)
         ml_predictor = MLPredictor()
