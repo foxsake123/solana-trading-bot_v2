@@ -1,102 +1,177 @@
-# core/data/token_scanner.py (Final Version)
-
+# core/data/token_scanner.py
+"""
+Token scanner module for discovering and analyzing potential trading opportunities
+"""
 import asyncio
 import logging
-from typing import List, Dict, Any
-
-from core.data.market_data import MarketDataManager
+import time
+from typing import Dict, List, Optional, Set
+from datetime import datetime, timedelta
+from core.data.market_data import BirdeyeAPI, MarketDataAggregator
 from core.analysis.token_analyzer import TokenAnalyzer
-from core.storage.database import Database
+from utils.helpers import fetch_with_retries
 
 logger = logging.getLogger(__name__)
 
+
 class TokenScanner:
     """
-    Scans for new tokens, filters them, and adds potential candidates to the database.
+    Scans for potential tokens using multiple data sources
     """
-    def __init__(self, db: Database, market_data: MarketDataManager, 
-                 token_analyzer: TokenAnalyzer, config):
-        self.db = db
-        self.market_data = market_data
-        self.token_analyzer = token_analyzer
+
+    def __init__(self, config: Dict, token_analyzer: TokenAnalyzer, birdeye_api_key: Optional[str] = None):
+        """
+        Initialize the TokenScanner
+        
+        :param config: Bot configuration dictionary
+        :param token_analyzer: TokenAnalyzer instance for token analysis
+        :param birdeye_api_key: Birdeye API key (optional)
+        """
         self.config = config
-
-        self.scan_interval = self.config.get('scan_interval_seconds', 300)
-        self.min_liquidity = self.config.get('min_liquidity_usd', 50000)
+        self.token_analyzer = token_analyzer
+        self.birdeye_api_key = birdeye_api_key
+        self.birdeye_api = None
+        self.db = None # This should be initialized properly, e.g., via a setup method
         
-        self._running = False
-        logger.info("TokenScanner initialized.")
-
-    async def start(self):
-        """Starts the continuous scanning process."""
-        self._running = True
-        logger.info(f"TokenScanner started. Will scan for new tokens every {self.scan_interval} seconds.")
-        # Run the first scan immediately on startup
-        await self.scan_for_new_tokens()
+        # Track analyzed tokens to avoid duplicates
+        self.analyzed_tokens: Set[str] = set()
+        self.last_scan_time = 0
+        self.scan_interval = config.get('scan_interval', 300)  # Default to 300 seconds from your log
         
-        while self._running:
-            await asyncio.sleep(self.scan_interval)
+        # Initialize Birdeye API if key provided
+        if self.birdeye_api_key:
+            self.birdeye_api = BirdeyeAPI(self.birdeye_api_key)
+            logger.info(f"TokenScanner initialized with Birdeye API.")
+        else:
+            logger.warning("TokenScanner initialized without Birdeye API key")
+
+    def set_db(self, db):
+        """Set the database instance for the scanner."""
+        self.db = db
+        logger.info("Database instance set for TokenScanner.")
+
+    async def start_scanning(self):
+        """Start the token scanning loop"""
+        logger.info(f"Token scanner started - scanning every {self.scan_interval} seconds.")
+
+        # Use the more robust MarketDataAggregator for all scanning
+        aggregator = MarketDataAggregator(self.birdeye_api_key)
+
+        while True:
             try:
-                await self.scan_for_new_tokens()
+                logger.info("Scanning for new tokens using MarketDataAggregator...")
+
+                # Discover new tokens using the aggregator
+                # This method is more robust and has fallbacks.
+                discovered_tokens = await aggregator.discover_tokens(max_tokens=100)
+
+                if discovered_tokens:
+                    logger.info(f"Discovered {len(discovered_tokens)} tokens from aggregator.")
+
+                    # Analyze each token
+                    for token in discovered_tokens:
+                        try:
+                            # Skip if already processed in this session to avoid redundant work
+                            address = token.get('address')
+                            if not address or address in self.analyzed_tokens:
+                                continue
+
+                            # Add to the set of analyzed tokens for this session
+                            self.analyzed_tokens.add(address)
+
+                            # Analyze the token using your existing analyzer
+                            # Ensure your TokenAnalyzer can handle the data structure from Birdeye
+                            analysis_result = await self.token_analyzer.analyze(token)
+
+                            # Check if the token is promising based on your score
+                            # The score threshold is from your config
+                            min_score = self.config.get('min_token_score', 0.7)
+                            if analysis_result and analysis_result.get('score', 0) > min_score:
+                                logger.info(f"Found promising token: {token.get('symbol')} (Score: {analysis_result.get('score', 0):.2f}). Storing in DB.")
+                                # The trading_bot logic will pick it up from the DB
+                                if self.db:
+                                    self.db.store_token(token_data={**token, **analysis_result})
+                                else:
+                                    logger.error("Database not initialized in TokenScanner. Cannot store token.")
+
+                        except Exception as e:
+                            logger.error(f"Error analyzing token {token.get('symbol', 'N/A')}: {e}", exc_info=True)
+
+                else:
+                    logger.warning("Token scanner did not receive any tokens from market data source.")
+
+                # Wait for the next scan interval
+                await asyncio.sleep(self.scan_interval)
+
             except Exception as e:
-                logger.error(f"Error during token scan loop: {e}", exc_info=True)
+                logger.critical(f"A critical error occurred in the main scanner loop: {e}", exc_info=True)
+                # Wait longer on critical errors to prevent rapid-fire failures
+                await asyncio.sleep(60)
 
-    def stop(self):
-        """Stops the scanning process."""
-        self._running = False
-        logger.info("TokenScanner stopping...")
-
-    async def scan_for_new_tokens(self):
+    def _should_analyze_token(self, token: Dict) -> bool:
         """
-        Fetches new tokens, filters them, and adds viable candidates to the database.
+        Check if a token should be analyzed based on basic criteria
+        
+        :param token: Token data dictionary
+        :return: True if token should be analyzed
         """
-        logger.info("Scanning for new tokens...")
-        try:
-            new_tokens = await self.market_data.get_new_token_pairs()
-            if not new_tokens:
-                logger.info("Token scanner did not receive any tokens from market data source.")
-                return
-
-            logger.info(f"Received {len(new_tokens)} tokens from Birdeye. Filtering and adding to DB...")
+        # Check minimum volume
+        min_volume = self.config.get('min_volume_24h', 10000)
+        if token.get('v24hUSD', 0) < min_volume: # Adjusted to a common Birdeye field name
+            return False
             
-            added_count = 0
-            for token in new_tokens:
-                if await self.is_token_viable(token):
-                    # If token is viable, add it to the database for the analyzer to pick up.
-                    await self.db.add_token(
-                        contract_address=token.get('address'),
-                        symbol=token.get('symbol', 'N/A'),
-                        name=token.get('name', 'N/A'),
-                        initial_score=50 # Assign a neutral base score
-                    )
-                    added_count += 1
+        # Check minimum liquidity
+        min_liquidity = self.config.get('min_liquidity', 5000)
+        if token.get('liquidity', 0) < min_liquidity:
+            return False
             
-            if added_count > 0:
-                logger.info(f"Added {added_count} new viable tokens to the database for analysis.")
-            else:
-                logger.info("No new viable tokens found in this scan.")
-
-        except Exception as e:
-            logger.error(f"Failed to complete token scan: {e}", exc_info=True)
-
-    async def is_token_viable(self, token: Dict[str, Any]) -> bool:
-        """
-        Applies basic filters to determine if a token is worth adding to our database.
-        """
-        # Ensure token has an address and symbol
-        address = token.get('address')
-        symbol = token.get('symbol')
-        if not address or not symbol:
+        # Skip stablecoins if configured
+        if not self.config.get('trade_stablecoins', False):
+            stable_symbols = ['USDC', 'USDT', 'DAI', 'BUSD', 'UST']
+            if token.get('symbol', '').upper() in stable_symbols:
+                return False
+                
+        # Skip if price is 0 or missing
+        if not token.get('price') or token['price'] == 0:
             return False
-
-        # Filter out tokens with very low liquidity
-        liquidity = token.get('liquidity', {}).get('usd', 0)
-        if liquidity < self.min_liquidity:
-            return False
-
-        # Check if we already have this token in our database
-        exists = await self.db.get_token(address)
-        if exists:
-            return False
-
+            
         return True
+        
+    async def get_trending_tokens(self) -> List[Dict]:
+        """Get trending tokens from Birdeye"""
+        if not self.birdeye_api:
+            logger.warning("Birdeye API not available")
+            return []
+            
+        try:
+            # This method might need to be part of your BirdeyeAPI class
+            tokens = await self.birdeye_api.get_trending_tokens(limit=20)
+            return tokens
+        except Exception as e:
+            logger.error(f"Error getting trending tokens: {e}")
+            return []
+            
+    async def get_token_details(self, contract_address: str) -> Optional[Dict]:
+        """Get detailed information about a specific token"""
+        if not self.birdeye_api:
+            return None
+            
+        try:
+            # These methods might need to be part of your BirdeyeAPI class
+            overview = await self.birdeye_api.get_token_overview(contract_address)
+            security = await self.birdeye_api.get_token_security(contract_address)
+            
+            if overview:
+                if security:
+                    overview['security'] = security
+                return overview
+                    
+        except Exception as e:
+            logger.error(f"Error getting token details: {e}")
+            
+        return None
+        
+    def clear_analyzed_tokens(self):
+        """Clear the set of analyzed tokens (call periodically)"""
+        self.analyzed_tokens.clear()
+        logger.info("Cleared analyzed tokens cache")
