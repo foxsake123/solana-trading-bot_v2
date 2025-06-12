@@ -459,6 +459,23 @@ class MarketDataAggregator:
     def __init__(self, birdeye_api_key: Optional[str] = None):
         self.birdeye = BirdeyeAPI(birdeye_api_key)
         self.dexscreener = DexScreenerAPI()
+
+    async def get_full_token_data(self, address: str) -> Optional[Dict]:
+        """Fetch and merge detailed token data from Birdeye"""
+        async with self.birdeye:
+            info = await self.birdeye.get_token_info(address)
+            overview = await self.birdeye.get_token_overview(address)
+            security = await self.birdeye.get_token_security(address)
+
+        data = {}
+        if info:
+            data.update(info)
+        if overview:
+            data.update(overview)
+        if security:
+            data["security"] = security
+
+        return data if data else None
         
     async def discover_tokens(self, max_tokens: int = 50) -> List[Dict]:
         """Discover tokens from all available sources"""

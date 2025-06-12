@@ -12,7 +12,7 @@ from configs.unified_config import Config
 from core.trading.enhanced_trading_bot import EnhancedTradingBot
 from core.blockchain.solana_client import SolanaTrader
 from core.data.token_scanner import TokenScanner
-from core.data.market_data import MarketDataManager
+from core.data.market_data import MarketDataAggregator
 from core.analysis.token_analyzer import TokenAnalyzer
 from core.storage.database import Database
 from core.trading.position_manager import PositionManager
@@ -53,7 +53,7 @@ async def main(mode: str):
         balance_sol, balance_usd = await solana_client.get_wallet_balance()
         logger.info(f"Initial balance: {balance_sol:.4f} SOL (${balance_usd:.2f})")
         
-        market_data = MarketDataManager(CONFIG)
+        market_data = MarketDataAggregator(CONFIG.birdeye_api_key)
         risk_manager = RiskManager(CONFIG, balance_sol)
         position_manager = PositionManager(db, risk_manager, CONFIG)
         token_analyzer = TokenAnalyzer(db, market_data, CONFIG)
